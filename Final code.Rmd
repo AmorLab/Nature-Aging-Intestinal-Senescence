@@ -1,11 +1,7 @@
----
-output: html_document
-editor_options: 
-  chunk_output_type: console
----
 #Alexander Harris and Joseph Gewolb
 #Bulk RNAseq plotting functions
-```{r}
+
+## --------------------------------------------------------------------------------------------------------
 library(DESeq2)
 library(dplyr)
 library(ggplot2)
@@ -16,29 +12,25 @@ library(viridis)
 library(EnhancedVolcano)
 library(ComplexHeatmap)
 library(circlize)
-```
+
 
 #Load in counts
-```{r}
 counts <- read.delim("count_matrix.txt", header = TRUE, row.names = 1)
 row.names(counts) <- make.unique(gsub("\\..*", "", row.names(counts)))
 counts <- counts[which(rowSums(counts) > 0),]
-```
+
 
 #Set conditions
-```{r}
 condition <- factor(c("O_UT","O_UT","O_uPAR","O_uPAR","Y_UT","Y_UT","Y_uPAR","Y_uPAR"))
 coldata <- data.frame(row.names = colnames(counts), condition)
-```
+
 
 #Run Deseq2
-```{r}
 dds <- DESeqDataSetFromMatrix(countData = round(counts), colData = coldata, design = ~condition)
 dds <- DESeq(dds)
-```
+
 
 #Normalization and vst
-```{r}
 norm_counts <- counts(dds, normalized = TRUE)
 norm_counts.df <- as.data.frame(norm_counts)
 norm_counts.df$symbol <- mapIds(org.Mm.eg.db,
@@ -52,10 +44,9 @@ row.names(norm_counts.df) <- norm_counts.df$symbol
 norm_counts.df$symbol <- NULL
 vsdata <- vst(dds, blind = TRUE)
 vsdata <- assay(vsdata)
-```
+
 
 #Get stemness gene expression levels for bar graphs
-```{r}
 genes_to_plot <- c("Lgr4", "Lgr5", "Myc", "Sox9", "Olfm4", "Ccnd1", 'Hopx', 'Malat1')
 vst_counts <- as.data.frame(vsdata)
 vst_counts$symbol <- mapIds(org.Mm.eg.db, keys = row.names(vst_counts), keytype = "ENSEMBL", column = "SYMBOL")
@@ -67,10 +58,9 @@ vst_subset <- vst_counts[genes_to_plot, ]
 vst_norm <- t(scale(t(vst_subset), center = TRUE, scale = FALSE))
 vst_norm <- t(apply(vst_norm, 1, function(x) x - min(x)))
 write.table(vst_norm,'vst_norm.csv',sep = ',')
-```
+
 
 #Prep for heatmap
-```{r}
 gene_symbols <- mapIds(org.Mm.eg.db,
                        keys = rownames(vsdata),
                        keytype = "ENSEMBL",
@@ -93,10 +83,9 @@ stem_mat_grouped <- sapply(grouping, function(reps) {
 })
 colnames(stem_mat_grouped) <- c("Old UT", "Old uPAR", "Young UT", "Young uPAR")
 stem_mat_grouped <- stem_mat_grouped[, c("Young UT", "Young uPAR", "Old UT", "Old uPAR")]
-```
+
 
 #Create heatmap
-```{r}
 heatmap_color_scale <- colorRamp2(c(-1.5, 0, 1.5), c("blue", "white", "red"))
 O_Y_heatmap <- Heatmap(
   stem_mat_grouped,
@@ -112,10 +101,9 @@ O_Y_heatmap <- Heatmap(
 pdf("O_Y_heatmap.pdf", width = 10, height = 6)
 draw(O_Y_heatmap)
 dev.off()
-```
+
 
 #Get lfcShrink for GSEA preranking
-```{r}
 res <- results(dds, contrast = c('condition','O_UT','Y_UT'))
 resLFCshrink <- lfcShrink(dds, contrast = c('condition','O_UT','Y_UT'), type = "ashr")
 resLFCshrink.df <- as.data.frame(resLFCshrink)
@@ -123,17 +111,15 @@ resLFCshrink.df$symbol <- mapIds(org.Mm.eg.db, keys = rownames(resLFCshrink.df),
 resLFCshrink.df <- na.omit(resLFCshrink.df)
 resLFCshrink.df <- resLFCshrink.df[!duplicated(resLFCshrink.df$symbol),]
 write.table(resLFCshrink.df,'lfcshrink_O_UT_Y_UT.csv',sep = ',')
-```
+
 
 #Prep for lollipop plot of GSEA pathways
-```{r}
 hm <- read.delim("Hallmark_O_uPAR_O_UT.txt", header = TRUE, row.names = 1)
 Paths <- rownames(hm)
 hm <- hm%>%mutate(Paths=fct_reorder(Paths, NES))
-```
+
 
 #Create lollipop plot for GSEA pathways
-```{r}
 Hallmark_O_uPAR_O_UT_lollipop <- ggplot(hm, aes(x = NES, y = Paths)) +
   geom_segment(aes(x = 0, y = Paths, xend = NES, yend = Paths)) +
   geom_point(aes(color = padj), size = 8) +
@@ -155,10 +141,9 @@ Hallmark_O_uPAR_O_UT_lollipop <- ggplot(hm, aes(x = NES, y = Paths)) +
     panel.grid.minor = element_blank()
   )
 ggsave(file = 'Hallmark_O_uPAR_O_UT_pathways.pdf', plot=Hallmark_O_uPAR_O_UT_lollipop, width=10, height=10, units="in")
-```
+
 
 #Prep for Volcano Plot
-```{r}
 sigs.df <- sigs.df %>% 
   mutate(
     regulation = case_when(
@@ -177,10 +162,9 @@ top_down <- sigs.df %>%
   arrange(log2FoldChange) %>%
   slice_head(n = 10)
 top_genes <- bind_rows(top_up, top_down)
-```
+
 
 #Create Enhanced Volcano Plot
-```{r}
 reg_colors <- c(
   "Not Significant" = "grey30",
   "Downregulated" = "#7CA1CC",
@@ -212,4 +196,3 @@ O_UT_Y_UT_Evolcano <- EnhancedVolcano(
   caption = NULL
 )
 ggsave(file = 'O_UT_Y_UT_Evolcano.pdf', plot=O_UT_Y_UT_Evolcano, width=10, height=6, units="in")
-```
