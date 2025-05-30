@@ -54,6 +54,21 @@ vsdata <- vst(dds, blind = TRUE)
 vsdata <- assay(vsdata)
 ```
 
+#Get stemness gene expression levels for bar graphs
+```{r}
+genes_to_plot <- c("Lgr4", "Lgr5", "Myc", "Sox9", "Olfm4", "Ccnd1", 'Hopx', 'Malat1')
+vst_counts <- as.data.frame(vsdata)
+vst_counts$symbol <- mapIds(org.Mm.eg.db, keys = row.names(vst_counts), keytype = "ENSEMBL", column = "SYMBOL")
+vst_counts <- na.omit(vst_counts)
+vst_counts <- vst_counts[!duplicated(vst_counts$symbol),]
+row.names(vst_counts) <- vst_counts$symbol
+vst_counts$symbol <- NULL
+vst_subset <- vst_counts[genes_to_plot, ]
+vst_norm <- t(scale(t(vst_subset), center = TRUE, scale = FALSE))
+vst_norm <- t(apply(vst_norm, 1, function(x) x - min(x)))
+write.table(vst_norm,'vst_norm.csv',sep = ',')
+```
+
 #Prep for heatmap
 ```{r}
 gene_symbols <- mapIds(org.Mm.eg.db,
@@ -198,5 +213,3 @@ O_UT_Y_UT_Evolcano <- EnhancedVolcano(
 )
 ggsave(file = 'O_UT_Y_UT_Evolcano.pdf', plot=O_UT_Y_UT_Evolcano, width=10, height=6, units="in")
 ```
-
-
